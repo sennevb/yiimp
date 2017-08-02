@@ -1,6 +1,8 @@
 
 #include "stratum.h"
 
+uint64_t lyra2z_height = 0;
+
 //#define MERKLE_DEBUGLOG
 //#define HASH_DEBUGLOG_
 //#define DONTSUBMIT
@@ -72,13 +74,14 @@ static void create_decred_header(YAAMP_JOB_TEMPLATE *templ, YAAMP_JOB_VALUES *ou
 		uint32_t size;
 		uint32_t ntime;
 		uint32_t nonce;
-		unsigned char extra[36];
+		unsigned char extra[32];
+		uint32_t stakever;
 		uint32_t hashtag[3];
 	} header;
 
 	memcpy(&header, templ->header, sizeof(header));
 
-	memset(header.extra, 0, 36);
+	memset(header.extra, 0, 32);
 	sscanf(nonce, "%08x", &header.nonce);
 
 	if (strcmp(vote, "")) {
@@ -215,6 +218,11 @@ static void client_do_submit(YAAMP_CLIENT *client, YAAMP_JOB *job, YAAMP_JOB_VAL
 		memset(block_hex, 0, block_size);
 		sprintf(block_hex, "%s%02x%s", submitvalues->header_be, (unsigned char)templ->txcount, submitvalues->coinbase);
 
+		if (g_current_algo->name && !strcmp("jha", g_current_algo->name)) {
+			// block header of 88 bytes
+			sprintf(block_hex, "%s8400000008000000%02x%s", submitvalues->header_be, (unsigned char)templ->txcount, submitvalues->coinbase);
+		}
+
 		vector<string>::const_iterator i;
 		for(i = templ->txdata.begin(); i != templ->txdata.end(); ++i)
 			sprintf(block_hex+strlen(block_hex), "%s", (*i).c_str());
@@ -280,6 +288,7 @@ static void client_do_submit(YAAMP_CLIENT *client, YAAMP_JOB *job, YAAMP_JOB_VAL
 
 		else {
 			debuglog("*** REJECTED :( %s block %d %d txs\n", coind->name, templ->height, templ->txcount);
+			rejectlog("REJECTED %s block %d\n", coind->symbol, templ->height);
 #ifdef HASH_DEBUGLOG_
 			//debuglog("block %s\n", block_hex);
 			debuglog("--------------------------------------------------------------\n");
@@ -390,10 +399,17 @@ bool client_submit(YAAMP_CLIENT *client, json_value *json_params)
 		return true;
 	}
 
-	if(strcmp(ntime, templ->ntime) && !ntime_valid_range(ntime))
+	if(strcmp(ntime, templ->ntime))
 	{
-		client_submit_error(client, job, 23, "Invalid time rolling", extranonce2, ntime, nonce);
-		return true;
+		if (!ntime_valid_range(ntime)) {
+			client_submit_error(client, job, 23, "Invalid time rolling", extranonce2, ntime, nonce);
+			return true;
+		}
+		// dont allow algos permutations change over time (can lead to different speeds)
+		if (!g_allow_rolltime) {
+			client_submit_error(client, job, 23, "Invalid ntime (rolling not allowed)", extranonce2, ntime, nonce);
+			return true;
+		}
 	}
 
 	YAAMP_SHARE *share = share_find(job->id, extranonce2, ntime, nonce, client->extranonce1);
@@ -444,6 +460,10 @@ bool client_submit(YAAMP_CLIENT *client, json_value *json_params)
 		build_submit_values_decred(&submitvalues, templ, client->extranonce1, extranonce2, ntime, nonce, vote, true);
 	else
 		build_submit_values(&submitvalues, templ, client->extranonce1, extranonce2, ntime, nonce);
+
+	if (templ->height && !strcmp(g_current_algo->name,"lyra2z")) {
+		lyra2z_height = templ->height;
+	}
 
 	// minimum hash diff begins with 0000, for all...
 	uint8_t pfx = submitvalues.hash_bin[30] | submitvalues.hash_bin[31];

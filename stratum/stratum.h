@@ -78,10 +78,15 @@ extern char g_sql_password[1024];
 extern char g_stratum_algo[1024];
 extern double g_stratum_difficulty;
 
+extern int g_stratum_max_cons;
 extern int g_stratum_max_ttf;
 extern bool g_stratum_reconnect;
 extern bool g_stratum_renting;
 
+extern uint64_t g_max_shares;
+extern uint64_t g_shares_counter;
+
+extern bool g_allow_rolltime;
 extern time_t g_last_broadcasted;
 
 extern struct ifaddrs *g_ifaddr;
@@ -131,21 +136,31 @@ void sha256_double_hash_hex(const char *input, char *output, unsigned int len);
 #include "algos/x14.h"
 #include "algos/x15.h"
 #include "algos/x17.h"
+#include "algos/xevan.h"
+#include "algos/hmq17.h"
 #include "algos/nist5.h"
 #include "algos/fresh.h"
 #include "algos/quark.h"
 #include "algos/neoscrypt.h"
 #include "algos/lyra2re.h"
 #include "algos/lyra2v2.h"
+#include "algos/lyra2z.h"
 #include "algos/blake.h"
 #include "algos/blakecoin.h"
 #include "algos/blake2.h"
 #include "algos/qubit.h"
 #include "algos/groestl.h"
+#include "algos/jha.h"
 #include "algos/skein.h"
 #include "algos/keccak.h"
+#include "algos/sha256t.h"
+#include "algos/skunk.h"
+#include "algos/timetravel.h"
+#include "algos/bitcore.h"
 
+#include "algos/bastion.h"
 #include "algos/bmw.h"
+#include "algos/deep.h"
 #include "algos/lbry.h"
 #include "algos/luffa.h"
 #include "algos/pentablake.h"
@@ -157,6 +172,7 @@ void sha256_double_hash_hex(const char *input, char *output, unsigned int len);
 #include "algos/hive.h"
 #include "algos/sib.h"
 #include "algos/m7m.h"
+#include "algos/tribus.h"
 #include "algos/veltor.h"
 #include "algos/velvet.h"
 #include "algos/argon2a.h"

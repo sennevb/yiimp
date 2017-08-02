@@ -78,6 +78,7 @@ static void share_add_worker(YAAMP_CLIENT *client, YAAMP_JOB *job, bool valid, c
 void share_add(YAAMP_CLIENT *client, YAAMP_JOB *job, bool valid, char *extranonce2, char *ntime, char *nonce, double share_diff, int error_number)
 {
 //	check_job(job);
+	g_shares_counter++;
 	share_add_worker(client, job, valid, ntime, share_diff, error_number);
 
 	YAAMP_SHARE *share = new YAAMP_SHARE;
@@ -257,7 +258,24 @@ void block_confirm(int coinid, const char *blockhash)
 			if (h1) snprintf(hash, 161, "%s", h1);
 			else if (h2) snprintf(hash, 161, "%s", h2);
 			//debuglog("%s: getblock %s -> pow %s\n", __func__, blockhash, hash);
-			json_value_free(json_res);
+			json_value_free(json);
+			break;
+		} else if (strcmp(coind->symbol,"ORB") == 0) {
+			char params[192];
+			sprintf(params, "[\"%s\"]", blockhash);
+			json_value *json = rpc_call(&coind->rpc, "getblock", params);
+			if(!json) {
+				debuglog("%s: error getblock, no answer\n", __func__);
+				break;
+			}
+			json_value *json_res = json_get_object(json, "result");
+			if(!json_res) {
+				debuglog("%s: error getblock, no result\n", __func__);
+				break;
+			}
+			const char *h = json_get_string(json_res, "proofhash");
+			if (h) snprintf(hash, 161, "%s", h);
+			json_value_free(json);
 			break;
 		}
 	}

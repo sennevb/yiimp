@@ -18,7 +18,7 @@ result:
 	"unsold": 0.00050362,
 	"balance": 0.00000000,
 	"unpaid": 0.00050362,
-	"paid": 0.00000000,
+	"paid24h": 0.00000000,
 	"total": 0.00050362
 }
 </pre>
@@ -33,7 +33,7 @@ result:
 	"unsold": 0.00050362,
 	"balance": 0.00000000,
 	"unpaid": 0.00050362,
-	"paid": 0.00000000,
+	"paid24h": 0.00000000,
 	"total": 0.00050362,
 	"miners":[{
 		"version": "ccminer\/1.8.2",
@@ -68,6 +68,7 @@ result:
 		"estimate_current": "0.00053653",
 		"estimate_last24h": "0.00036408",
 		"actual_last24h": "0.00035620",
+		"hashrate_last24h": 269473000,
 		"rental_current": "3.61922463"
 	},
 
@@ -83,16 +84,18 @@ request:
 result:
 <pre class="main-left-box" style='padding: 3px; font-size: .8em; background-color: #ffffee; font-family: monospace;'>
 {
-	"AMBER": {
-		"algo": "x13",
-		"port": 3633,
-		"name": "AmberCoin",
-		"height": 1349673,
-		"workers": 0,
-		"shares": 1,
-		"hashrate": 0,
-		"lastblock": 1347605,
-		"timesincelast": 56337
+	"BTX": {
+		"algo": "bitcore",
+		"port": 3556,
+		"name": "BitCore",
+		"height": 18944,
+		"workers": 181,
+		"shares": 392,
+		"hashrate": 7267227499,
+		"24h_blocks": 329,
+		"24h_btc": 0.54471295,
+		"lastblock": 18945,
+		"timesincelast": 67
 	},
 
 	...

@@ -53,8 +53,9 @@ class CoindbCommand extends CConsoleCommand
 			$nbUpdated  = $this->grabBterIcons();
 			$nbUpdated += $this->grabCcexIcons();
 			$nbUpdated += $this->grabCryptopiaIcons();
+			$nbUpdated += $this->grabBittrexIcons(); // can be huge ones
+			$nbUpdated += $this->grabCoinExchangeIcons();
 			$nbUpdated += $this->grabAlcurexIcons();
-			$nbUpdated += $this->grabCryptomicIcons();
 			$nbUpdated += $this->grabNovaIcons();
 
 			echo "total updated: $nbUpdated\n";
@@ -296,6 +297,59 @@ class CoindbCommand extends CConsoleCommand
 	}
 
 	/**
+	 * Icon grabber - Bittrex
+	 */
+	public function grabBittrexIcons()
+	{
+		$nbUpdated = 0;
+		$markets = bittrex_api_query('public/getmarkets');
+		if (!is_object($markets) || !is_object($markets->result)) {
+			echo "bittrex api error\n";
+			return $nbUpdated;
+		}
+		$sql = "SELECT DISTINCT coins.id FROM coins INNER JOIN markets M ON M.coinid = coins.id WHERE M.name='bittrex' AND IFNULL(coins.image,'') = ''";
+		$coins = dbolist($sql);
+		if (empty($coins))
+			return $nbUpdated;
+		echo "bittrex: try to download new icons...\n";
+		foreach ($coins as $coin) {
+			$coin = getdbo('db_coins', $coin["id"]);
+			$symbol = $coin->symbol;
+			if (!empty($coin->symbol2)) $symbol = $coin->symbol2;
+			$local = $this->basePath."/images/coin-{$symbol}.png";
+			$url = '';
+			foreach ($markets->result as $m) {
+				if ($m->MarketCurrency == $symbol) {
+					$url = $m->LogoUrl;
+					break;
+				}
+			}
+			if (empty($url)) continue;
+			try {
+				$data = @ file_get_contents($url);
+			} catch (Exception $e) {
+				continue;
+			}
+			if (strlen($data) < 2048) continue;
+			file_put_contents($local, $data);
+			$size = filesize($local);
+			if ($size > 0) {
+				if ($size > 100*1024) {
+					echo "warning: $symbol icon is huge, ".round($size/1024,1)." KB ($url)\n";
+					unlink($local);
+				} else {
+					echo $symbol." icon found\n";
+					$coin->image = "/images/coin-{$symbol}.png";
+					$nbUpdated += $coin->save();
+				}
+			}
+		}
+		if ($nbUpdated)
+			echo "$nbUpdated icons downloaded from bittrex\n";
+		return $nbUpdated;
+	}
+
+	/**
 	 * Icon grabber - Ccex
 	 */
 	public function grabCcexIcons()
@@ -367,6 +421,42 @@ class CoindbCommand extends CConsoleCommand
 	}
 
 	/**
+	 * Icon grabber - CoinExchange
+	 */
+	public function grabCoinExchangeIcons()
+	{
+		$url = 'https://www.coinexchange.io/assets/currencies/';
+		$nbUpdated = 0;
+		$sql = "SELECT DISTINCT coins.id FROM coins INNER JOIN markets M ON M.coinid = coins.id ".
+			"WHERE M.name='coinexchange' AND IFNULL(coins.image,'') = ''";
+		$coins = dbolist($sql);
+		if (empty($coins))
+			return 0;
+		echo "coinexchange: try to download new icons...\n";
+		foreach ($coins as $coin) {
+			$coin = getdbo('db_coins', $coin["id"]);
+			$symbol = $coin->symbol;
+			if (!empty($coin->symbol2)) $symbol = $coin->symbol2;
+			$local = $this->basePath."/images/coin-{$symbol}.png";
+			try {
+				$data = @ file_get_contents($url.strtolower($coin->name).'.png');
+			} catch (Exception $e) {
+				continue;
+			}
+			if (strlen($data) < 2048) continue;
+			echo $symbol." icon found\n";
+			file_put_contents($local, $data);
+			if (filesize($local) > 0) {
+				$coin->image = "/images/coin-{$symbol}.png";
+				$nbUpdated += $coin->save();
+			}
+		}
+		if ($nbUpdated)
+			echo "$nbUpdated icons downloaded from coinexchange\n";
+		return $nbUpdated;
+	}
+
+	/**
 	 * Icon grabber - Alcurex
 	 */
 	public function grabAlcurexIcons()
@@ -399,42 +489,6 @@ class CoindbCommand extends CConsoleCommand
 		}
 		if ($nbUpdated)
 			echo "$nbUpdated icons downloaded from alcurex\n";
-		return $nbUpdated;
-	}
-
-	/**
-	 * Icon grabber - Cryptomic
-	 */
-	public function grabCryptomicIcons()
-	{
-		$url = 'https://cdn.cryptomic.com/images/currencyicons/';
-		$nbUpdated = 0;
-		$sql = "SELECT DISTINCT coins.id FROM coins INNER JOIN markets M ON M.coinid = coins.id ".
-			"WHERE M.name='cryptomic' AND IFNULL(coins.image,'') = ''";
-		$coins = dbolist($sql);
-		if (empty($coins))
-			return 0;
-		echo "cryptomic: try to download new icons...\n";
-		foreach ($coins as $coin) {
-			$coin = getdbo('db_coins', $coin["id"]);
-			$symbol = $coin->symbol;
-			if (!empty($coin->symbol2)) $symbol = $coin->symbol2;
-			$local = $this->basePath."/images/coin-{$symbol}.png";
-			try {
-				$data = @ file_get_contents($url.strtoupper($symbol).'-64.png');
-			} catch (Exception $e) {
-				continue;
-			}
-			if (strlen($data) < 2048) continue;
-			echo $symbol." icon found\n";
-			file_put_contents($local, $data);
-			if (filesize($local) > 0) {
-				$coin->image = "/images/coin-{$symbol}.png";
-				$nbUpdated += $coin->save();
-			}
-		}
-		if ($nbUpdated)
-			echo "$nbUpdated icons downloaded from cryptomic\n";
 		return $nbUpdated;
 	}
 

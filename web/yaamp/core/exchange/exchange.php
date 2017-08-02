@@ -1,13 +1,16 @@
 <?php
 
+/* A REST/JSON API IS NOT SUPPOSED TO RETURN HTML AND CSS! MORONS!!!! */
 function strip_data($data)
 {
-        $out = strip_tags($data);
-        $out = preg_replace("#[\t ]+#", " ", $out);
-        $out = preg_replace("# [\r\n]+#", "\n", $out);
-        $out = preg_replace("#[\r\n]+#", "\n", $out);
-        if (strpos($out, 'CloudFlare') !== false) $out = 'CloudFlare error';
-        return $out;
+	$out = strip_tags($data);
+	$out = preg_replace("#[\t ]+#", " ", $out);
+	$out = preg_replace("# [\r\n]+#", "\n", $out);
+	$out = preg_replace("#[\r\n]+#", "\n", $out);
+	if (strpos($out, 'CloudFlare') !== false) $out = 'CloudFlare error';
+	if (strpos($out, 'DDoS protection by Cloudflare') !== false) $out = 'CloudFlare error';
+	if (strpos($out, '500 Error') !== false) $out = '500 Error';
+	return $out;
 }
 
 require_once("poloniex.php");
@@ -17,20 +20,22 @@ require_once("ccexapi.php");
 require_once("bleutrade.php");
 require_once("kraken.php");
 require_once("yobit.php");
-require_once("cryptsy.php");
-require_once("safecex.php");
+require_once("shapeshift.php");
 require_once("bter.php");
 require_once("empoex.php");
 require_once("jubi.php");
 require_once("alcurex.php");
 require_once("cryptopia.php");
-require_once("cryptomic.php");
+require_once("hitbtc.php");
+require_once("livecoin.php");
 require_once("nova.php");
+require_once("coinexchange.php");
+require_once("coinsmarkets.php");
 
 /* Format an exchange coin Url */
 function getMarketUrl($coin, $marketName)
 {
-	$symbol = !empty($coin->symbol2) ? $coin->symbol2 : $coin->symbol;
+	$symbol = $coin->getOfficialSymbol();
 	$lowsymbol = strtolower($symbol);
 	$base = 'BTC';
 
@@ -60,26 +65,50 @@ function getMarketUrl($coin, $marketName)
 		$url = "https://bleutrade.com/exchange/{$symbol}/{$base}";
 	else if($market == 'bter')
 		$url = "https://bter.com/trade/{$lowsymbol}_{$lowbase}";
-	else if($market == 'banx' || $market == 'cryptomic')
-		$url = "https://www.cryptomic.com/trade?c={$symbol}&p={$base}";
+	else if($market == 'coinexchange')
+		$url = "https://www.coinexchange.io/market/{$symbol}/{$base}";
+	else if($market == 'coinsmarkets')
+		$url = " https://coinsmarkets.com/trade-{$base}-{$symbol}.htm";
 	else if($market == 'cryptopia')
 		$url = "https://www.cryptopia.co.nz/Exchange?market={$symbol}_{$base}";
-	else if($market == 'cryptsy')
-		$url = "https://www.cryptsy.com/markets/view/{$symbol}_{$base}";
 	else if($market == 'c-cex')
 		$url = "https://c-cex.com/?p={$lowsymbol}-{$lowbase}";
 	else if($market == 'empoex')
 		$url = "http://www.empoex.com/trade/{$symbol}-{$base}";
 	else if($market == 'jubi')
 		$url = "http://jubi.com/coin/{$lowsymbol}";
+	else if($market == 'hitbtc')
+		$url = "https://hitbtc.com/exchange/{$symbol}-to-{$base}";
+	else if($market == 'livecoin')
+		$url = "https://www.livecoin.net/trade/?currencyPair={$symbol}%2F{$base}";
 	else if($market == 'nova')
 		$url = "https://novaexchange.com/market/{$base}_{$symbol}/";
-	else if($market == 'safecex')
-		$url = "https://safecex.com/market?q={$symbol}/{$base}";
 	else if($market == 'yobit')
 		$url = "https://yobit.net/en/trade/{$symbol}/{$base}";
 	else
 		$url = "";
 
 	return $url;
+}
+
+// $market can be a db_markets or a string (symbol)
+function exchange_update_market($exchange, $market)
+{
+	$fn_update = str_replace('-','',$exchange.'_update_market');
+	if (function_exists($fn_update)) {
+		return $fn_update($market);
+	} else {
+		debuglog(__FUNCTION__.': '.$fn_update.'() not implemented');
+		user()->setFlash('error', $fn_update.'() not yet implemented');
+		return false;
+	}
+}
+
+// used to manually update one market price
+function exchange_update_market_by_id($idmarket)
+{
+	$market = getdbo('db_markets', $idmarket);
+	if (!$market) return false;
+
+	return exchange_update_market($market->name, $market);
 }

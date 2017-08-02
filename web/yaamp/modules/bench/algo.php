@@ -13,7 +13,7 @@ $in_db = dbolist("SELECT algo, count(id) as count FROM benchmarks B GROUP BY alg
 foreach ($in_db as $row) {
 	$algos[$row['algo']] = $row['count'];
 }
-$options = '<option value="all">Show all</option>';
+$options = '';
 foreach($algos as $a => $count) {
 	if($a == $algo)
 		$options .= '<option value="'.$a.'" selected="selected">'.$a.'</option>';
@@ -58,7 +58,8 @@ showTableSorter('maintable', "{
 	tableClass: 'dataGrid',
 	widgets: ['zebra','filter'],
 	textExtraction: {
-		2: function(node, table, n) { return $(node).attr('data'); }
+		2: function(node, table, n) { return $(node).attr('data'); },
+		4: function(node, table, n) { return $(node).attr('data'); },
 	},
 	widgetOptions: {
 		filter_external: '.search',
@@ -72,13 +73,14 @@ echo <<<END
 <thead>
 <tr>
 <th data-sorter="text" width="50">Type</th>
-<th data-sorter="text" width="220">Chip</th>
-<th data-sorter="numeric" width="220">Hashrate</th>
-<th data-sorter="numeric" width="220">Power</th>
-<th data-sorter="currency" title="mBTC/day">Cost*</th>
-<th data-sorter="currency" title="mBTC/day">Reward</th>
-<th data-sorter="currency" title="mBTC/day">Profit**</th>
-<th data-sorter="numeric" width="220">Int</th>
+<th data-sorter="text" width="300">Chip</th>
+<th data-sorter="numeric" width="100">Hashrate</th>
+<th data-sorter="numeric" width="80">Power</th>
+<th data-sorter="numeric" width="220">H/W</th>
+<th data-sorter="currency" width="100" title="mBTC/day">Cost*</th>
+<th data-sorter="currency" width="100" title="mBTC/day">Reward</th>
+<th data-sorter="currency" width="220" title="mBTC/day">Profit**</th>
+<th data-sorter="numeric" width="100">Int</th>
 <th data-sorter="numeric" width="220">Freq</th>
 </tr>
 </thead><tbody>
@@ -88,6 +90,8 @@ if ($algo != 'all') {
 	$t1 = time() - 24*60*60;
 	$algo_24E = dboscalar("SELECT avg(price) FROM hashrate WHERE time>$t1 AND algo=:algo", array(':algo'=>$algo));
 	$algo_24E = $algo_24E / (1000 * yaamp_algo_mBTC_factor($algo)); // mBTC per kHs
+} else {
+	$this->goback();
 }
 
 foreach ($in_db as $row) {
@@ -102,22 +106,36 @@ foreach ($in_db as $row) {
 	$chip = CHtml::link($row['chip'], '/bench?chip='.$row['idchip'].'&algo='.$algo);
 	echo '<td>'.$chip.'</td>';
 
-	$cost = powercost_mBTC($power);
 	$reward = $row['khps']*$algo_24E;
 
-	echo '<td data="'.$row['khps'].'">'.Itoa2(1000*round($row['khps'],3),3).'H</td>';
-	echo '<td>'.($power>0 ? round($power) : '-').'</td>';
-	echo '<td>'.($power>0 ? mbitcoinvaluetoa($cost) : '-').'</td>';
-	if (isset($algo_24E)) {
-		echo '<td>'.mbitcoinvaluetoa($reward).'</td>';
-		if ($reward < $cost)
-			echo '<td class="red">'.($power>0 ? mbitcoinvaluetoa($reward - $cost) : '-').'</td>';
-		else
-			echo '<td>'.($power>0 ? mbitcoinvaluetoa($reward - $cost) : '-').'</td>';
-	} else {
-		echo '<td>-</td>';
-		echo '<td>-</td>';
+	// Adjust the 750 Ti nvml watts
+	$factor = 1.0;
+	if ($row['chip'] == '750' || $row['chip'] == '750 Ti' || $row['chip'] == 'Quadro K620') $factor = 2.0;
+	$power *= $factor;
+
+	$cost = powercost_mBTC($power);
+	$ppw = $power>0 ? (double) $row['khps']/$power : 0.;
+	$ppw_label = ($power>0 ? Itoa2(1000*round($ppw,3),3).'H' : '-');
+
+	if ($algo == 'equihash') {
+		echo '<td data="'.$row['khps'].'">'.round(1000*$row['khps'],1).'&nbsp;Sol/s</td>';
+		$ppw_label = ($power>0 ? Itoa2(1000*round($ppw,5),2).'&nbsp;Sol/W' : '-');
 	}
+	else
+		echo '<td data="'.$row['khps'].'">'.Itoa2(1000*round($row['khps'],3),3).'H</td>';
+
+	if ($factor > 1.0)
+		echo '<td style="opacity:.75;" title="Note: The '.$row['chip'].' power value seems to be for the chip only, x2 factor applied!">'.($power>0 ? round($power).'&nbsp;W*' : '-').'</td>';
+	else
+		echo '<td>'.($power>0 ? round($power).'&nbsp;W' : '-').'</td>';
+
+	echo '<td data="'.$ppw.'">'.$ppw_label.'</td>';
+	echo '<td>'.($power>0 ? mbitcoinvaluetoa($cost) : '-').'</td>';
+	echo '<td>'.mbitcoinvaluetoa($reward).'</td>';
+	if ($reward < $cost)
+		echo '<td class="red">'.($power>0 ? mbitcoinvaluetoa($reward - $cost) : '-').'</td>';
+	else
+		echo '<td>'.($power>0 ? mbitcoinvaluetoa($reward - $cost) : '-').'</td>';
 	echo '<td>'.($row['intensity']>0 ? round($row['intensity']) : '-').'</td>';
 	echo '<td>'.($row['freq']>0 ? round($row['freq']) : '-').'</td>';
 
